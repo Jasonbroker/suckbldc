@@ -20,9 +20,7 @@ float target_angle = 0;
 
 // instantiate the commander
 Commander command = Commander(Serial);
-// void doTarget(char* cmd) { command.scalar(&target_velocity, cmd); }
-void doLimit(char* cmd) { command.scalar(&motor.voltage_limit, cmd); }
-void doTarget(char* cmd) { command.scalar(&target_angle, cmd); }
+void doMotor(char* cmd) { command.motor(&motor, cmd); }
 
 void setup() {
 
@@ -30,7 +28,7 @@ void setup() {
   Serial.begin(115200);
   // enable more verbose output for debugging
   // comment out if not needed
-  SimpleFOCDebug::enable(&Serial);
+  // SimpleFOCDebug::enable(&Serial);
 
     // initialise magnetic sensor hardware
   sensor.init();
@@ -61,7 +59,7 @@ void setup() {
   motor.voltage_limit = 12;   // [V]
  
    // choose FOC modulation (optional)
-  motor.foc_modulation = FOCModulationType::SpaceVectorPWM;
+  // motor.foc_modulation = FOCModulationType::SpaceVectorPWM;
   
   // set motion control loop to be used
   motor.controller = MotionControlType::angle;
@@ -81,9 +79,6 @@ void setup() {
   motor.P_angle.P = 10;
   // maximal velocity of the position control
   motor.velocity_limit = 20;
-  
-  // comment out if not needed
-  motor.useMonitoring(Serial);
 
   // init motor hardware
   if(!motor.init()){
@@ -94,34 +89,26 @@ void setup() {
     // align sensor and start FOC
   motor.initFOC();
 
-  // add target command T
-  // command.add('T', doTarget, "target velocity");
-  command.add('L', doLimit, "voltage limit");
-  command.add('T', doTarget, "target angle");
-
-  Serial.println("Motor ready!");
-  Serial.println("Set target angle [rad/s]");
-
+  // add the motor to the commander interface
+  // The letter (here 'M') you will provide to the SimpleFOCStudio
+  command.add('M',doMotor,"motor");
+  // tell the motor to use the monitoring
+  motor.useMonitoring(Serial);
+  motor.monitor_downsample = 0; // disable monitor at first - optional
 
   _delay(1000);
 }
 
+// 输入M100 即目标是100，根据motiontype不同，可以是角度，速度，力矩
 void loop() {
-
-  // delay(5);
-  // return;
-    // display the angle and the angular velocity to the terminal
-  // Serial.println(sensor.getSensorAngle());
-  // Serial.print("\t");
-  // Serial.println(sensor.getVelocity());
-  // return;
-
   motor.loopFOC();
-  
-  motor.move(target_angle);
 
+  // this function can be run at much lower frequency than loopFOC()
+  motor.move();
+
+  // real-time monitoring calls
+  motor.monitor();
   // user communication
   command.run();
-
 
 }
