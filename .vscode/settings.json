@@ -12,6 +12,7 @@
         "unordered_map": "cpp",
         "vector": "cpp",
         "ostream": "cpp",
-        "print": "cpp"
+        "print": "cpp",
+        "random": "cpp"
     }
 }

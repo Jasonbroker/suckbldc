@@ -22,13 +22,20 @@ float target_angle = 0;
 Commander command = Commander(Serial);
 void doMotor(char* cmd) { command.motor(&motor, cmd); }
 
+#define ENABLE_CURRENT_SENSING
+
+#ifdef ENABLE_CURRENT_SENSING
+InlineCurrentSense current_sense  = InlineCurrentSense((float)0.01, (float)50.0, 26, 27, _NC);
+#endif
 void setup() {
 
   // use monitoring with serial 
   Serial.begin(115200);
+
+  delay(3000);
   // enable more verbose output for debugging
   // comment out if not needed
-  // SimpleFOCDebug::enable(&Serial);
+  SimpleFOCDebug::enable(&Serial);
 
     // initialise magnetic sensor hardware
   sensor.init();
@@ -52,6 +59,25 @@ void setup() {
   // link the motor and the driver
   motor.linkDriver(&driver);
 
+#ifdef ENABLE_CURRENT_SENSING
+  // link current sense and driver
+  current_sense.linkDriver(&driver);
+  // init current sense
+  if (current_sense.init())
+    Serial.println("Current sense init success!");
+  else{
+    Serial.println("Current sense init failed!");
+    return;
+  }
+
+  // link motor and current sense
+  motor.linkCurrentSense(&current_sense);
+
+  // for SimpleFOCShield v2.01/v2.0.2
+  current_sense.gain_b *= -1;
+  // skip alignment
+  // current_sense.skip_align = true;
+#endif
   // limiting motor movements
   // limit the voltage to be set to the motor
   // start very low for high resistance motors
@@ -97,6 +123,13 @@ void setup() {
   motor.monitor_downsample = 0; // disable monitor at first - optional
 
   _delay(1000);
+
+  Serial.print("Current sense gains: a = ");
+  Serial.print(current_sense.offset_ia); // milli Amps
+  Serial.print("\tb=");
+  Serial.print(current_sense.offset_ib); // milli Amps
+  Serial.print("\tc=");
+  Serial.println(current_sense.offset_ic); // milli Amps
 }
 
 // 输入M100 即目标是100，根据motiontype不同，可以是角度，速度，力矩
@@ -105,6 +138,21 @@ void loop() {
 
   // this function can be run at much lower frequency than loopFOC()
   motor.move();
+
+#ifdef ENABLE_CURRENT_SENSING
+
+  PhaseCurrent_s currents = current_sense.getPhaseCurrents();
+  float current_magnitude = current_sense.getDCCurrent();
+
+  Serial.print(currents.a*1000); // milli Amps
+  Serial.print("\t");
+  Serial.print(currents.b*1000); // milli Amps
+  Serial.print("\t");
+  Serial.print(currents.c*1000); // milli Amps
+  Serial.print("\t");
+  Serial.println(current_magnitude*1000); // milli Amps
+
+#endif
 
   // real-time monitoring calls
   motor.monitor();
